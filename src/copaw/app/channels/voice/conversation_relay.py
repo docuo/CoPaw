@@ -12,6 +12,8 @@ from agentscope_runtime.engine.schemas.agent_schemas import (
     RunStatus,
 )
 
+from fastapi import WebSocketDisconnect
+
 from .session import CallSessionManager
 
 if TYPE_CHECKING:
@@ -78,13 +80,16 @@ class ConversationRelayHandler:
                         await self._handle_dtmf(msg)
                     case _:
                         logger.debug("Unknown WS message type: %s", msg_type)
-        except Exception as exc:
-            # WebSocket closed or other error
+        except WebSocketDisconnect:
+            logger.info(
+                "ConversationRelay WS disconnected: call_sid=%s",
+                self.call_sid,
+            )
+        except Exception:
             if not self._closed:
-                logger.info(
-                    "ConversationRelay WS ended: call_sid=%s reason=%s",
+                logger.exception(
+                    "Unexpected error in ConversationRelay: call_sid=%s",
                     self.call_sid,
-                    str(exc)[:200],
                 )
         finally:
             self._closed = True
@@ -104,6 +109,10 @@ class ConversationRelayHandler:
             self.caller_info.get("from"),
             self.caller_info.get("to"),
         )
+        if not self.call_sid:
+            logger.warning("Setup message missing callSid, closing connection")
+            await self.close()
+            return
         self._session_mgr.create_session(
             call_sid=self.call_sid,
             handler=self,

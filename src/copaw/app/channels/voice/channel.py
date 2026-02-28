@@ -108,7 +108,12 @@ class VoiceChannel(BaseChannel):
                 status_callback_url=status_cb_url,
             )
         except Exception:
-            logger.exception("Failed to configure Twilio webhook")
+            logger.exception(
+                "Failed to configure Twilio webhook; stopping tunnel",
+            )
+            await self.tunnel_mgr.stop()
+            self.tunnel_mgr = None
+            return
 
         logger.info(
             "Voice channel started: tunnel=%s phone=%s",

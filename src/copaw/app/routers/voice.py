@@ -65,7 +65,14 @@ async def _validate_twilio_signature(request: Request) -> None:
 
     validator = RequestValidator(auth_token)
     form = await request.form()
-    url = str(request.url)
+    # Behind a tunnel/reverse-proxy, request.url has the internal scheme
+    # and host.  Reconstruct the public URL that Twilio actually signed
+    # using forwarded headers so signature validation succeeds.
+    proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.headers.get("x-forwarded-host", request.url.netloc)
+    url = f"{proto}://{host}{request.url.path}"
+    if request.url.query:
+        url = f"{url}?{request.url.query}"
     params = {k: str(v) for k, v in form.items()}
 
     if not validator.validate(url, params, signature):
@@ -121,7 +128,12 @@ async def voice_incoming(request: Request) -> Response:
 
 @voice_router.websocket("/voice/ws")
 async def voice_ws(websocket: WebSocket) -> None:
-    """ConversationRelay WebSocket endpoint."""
+    """ConversationRelay WebSocket endpoint.
+
+    TODO: add application-level auth (e.g. a per-run token embedded in
+    the TwiML ws_url and validated on connect) to prevent arbitrary
+    internet clients from connecting via the public tunnel URL.
+    """
     from ..channels.voice.conversation_relay import ConversationRelayHandler
 
     voice_ch = _get_voice_channel(websocket)
