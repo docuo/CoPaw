@@ -191,8 +191,14 @@ class VoiceChannel(BaseChannel):
         """Public accessor for the process handler."""
         return self._process
 
+    _MAX_PENDING_TOKENS = 100
+
     def create_ws_token(self) -> str:
         """Generate a single-use token for WebSocket authentication."""
+        # Evict oldest tokens if the set grows too large (e.g. calls
+        # that generated TwiML but never connected via WebSocket).
+        while len(self._pending_ws_tokens) >= self._MAX_PENDING_TOKENS:
+            self._pending_ws_tokens.pop()
         token = secrets.token_urlsafe(32)
         self._pending_ws_tokens.add(token)
         return token

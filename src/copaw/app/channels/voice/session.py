@@ -57,7 +57,7 @@ class CallSessionManager:
         return self._sessions.get(call_sid)
 
     def end_session(self, call_sid: str) -> None:
-        session = self._sessions.get(call_sid)
+        session = self._sessions.pop(call_sid, None)
         if session:
             session.status = "ended"
             logger.info("Call session ended: call_sid=%s", call_sid)

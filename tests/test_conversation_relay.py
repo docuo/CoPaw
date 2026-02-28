@@ -4,6 +4,7 @@ import json
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from fastapi import WebSocketDisconnect
 
 from copaw.app.channels.voice.conversation_relay import (
     ConversationRelayHandler,
@@ -20,7 +21,7 @@ def _make_handler(
     if messages is not None:
         # Set up receive_text to return messages in order then raise
         side_effects = [json.dumps(m) for m in messages]
-        side_effects.append(Exception("WS closed"))
+        side_effects.append(WebSocketDisconnect())
         ws.receive_text = AsyncMock(side_effect=side_effects)
 
     session_mgr = CallSessionManager()
@@ -173,10 +174,9 @@ class TestConversationRelayHandler:
         handler, _ws, session_mgr = _make_handler(messages)
         await handler.handle()
 
-        # After WS closes, session should be ended
+        # After WS closes, session should be cleaned up
         session = session_mgr.get_session("CA123")
-        assert session is not None
-        assert session.status == "ended"
+        assert session is None
 
     @pytest.mark.asyncio
     async def test_empty_prompt_ignored(self):

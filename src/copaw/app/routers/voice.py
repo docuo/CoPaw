@@ -68,8 +68,14 @@ async def _validate_twilio_signature(request: Request) -> None:
     # Behind a tunnel/reverse-proxy, request.url has the internal scheme
     # and host.  Reconstruct the public URL that Twilio actually signed
     # using forwarded headers so signature validation succeeds.
-    proto = request.headers.get("x-forwarded-proto", request.url.scheme)
-    host = request.headers.get("x-forwarded-host", request.url.netloc)
+    raw_proto = request.headers.get("x-forwarded-proto", "")
+    proto = (
+        raw_proto.split(",")[0].strip() if raw_proto else request.url.scheme
+    )
+    raw_host = request.headers.get("x-forwarded-host", "")
+    host = (
+        raw_host.split(",")[0].strip() if raw_host else request.url.netloc
+    )
     url = f"{proto}://{host}{request.url.path}"
     if request.url.query:
         url = f"{url}?{request.url.query}"
